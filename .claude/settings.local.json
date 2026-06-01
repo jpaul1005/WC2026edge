@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "PowerShell(Get-Command node -ErrorAction SilentlyContinue; Get-ChildItem \"C:\\\\Program Files\\\\nodejs\" -ErrorAction SilentlyContinue | Select-Object -First 3; Get-ChildItem \"$env:APPDATA\\\\npm\" -ErrorAction SilentlyContinue | Select-Object -First 3; Get-ChildItem \"$env:LOCALAPPDATA\\\\Programs\\\\nodejs\" -ErrorAction SilentlyContinue | Select-Object -First 3)",
+      "WebFetch(domain:www.fotmob.com)",
+      "WebSearch",
+      "WebFetch(domain:www.fifa.com)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "WebFetch(domain:www.mlssoccer.com)",
+      "WebFetch(domain:www.sportmonks.com)",
+      "WebFetch(domain:soccer2026.app)",
+      "WebFetch(domain:www.futbolupdate.com)",
+      "WebFetch(domain:data-api.polymarket.com)"
+    ]
+  }
+}
