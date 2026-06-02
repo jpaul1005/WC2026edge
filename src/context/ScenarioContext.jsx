@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react'
+import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react'
 import { GROUPS } from '../data/teams.js'
+import { supabase } from '../lib/supabase.js'
 
 // ── Default data ──────────────────────────────────────────────────────────────
 const DEFAULT_GROUP_PICKS = Object.fromEntries(
@@ -128,6 +129,13 @@ function reducer(state, action) {
         userProbOverrides: { ...s.userProbOverrides, [action.teamId]: action.prob },
       }))
     }
+    case 'LOAD_SCENARIOS': {
+      return { scenarios: action.scenarios, activeId: action.activeId }
+    }
+    case 'RESET_TO_DEFAULT': {
+      const s = makeScenario({ name: 'Scenario A' })
+      return { scenarios: [s], activeId: s.id }
+    }
     default:
       return state
   }
@@ -179,12 +187,10 @@ export function ScenarioProvider({ children }) {
       if (saved) {
         const parsed = JSON.parse(saved)
         if (parsed.scenarios?.length) {
-          // Validate: check if team IDs in groupPicks match current GROUPS
           const validIds = new Set(Object.values(GROUPS).flat().map(t => t.id))
           const firstPicks = parsed.scenarios[0]?.groupPicks?.A || []
           const isValid = firstPicks.length > 0 && firstPicks.every(id => validIds.has(id))
           if (isValid) return parsed
-          // Invalid team IDs found — clear and start fresh
           localStorage.removeItem(STORAGE_KEY)
         }
       }
@@ -192,9 +198,64 @@ export function ScenarioProvider({ children }) {
     return { scenarios: [DEFAULT_SCENARIO], activeId: DEFAULT_SCENARIO.id }
   })
 
+  const saveTimerRef = useRef(null)
+
+  // Save to localStorage always
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
   }, [state])
+
+  // Sync to Supabase when logged in (debounced 2s)
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session?.user) return
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = setTimeout(async () => {
+        const userId = session.user.id
+        // Upsert each scenario
+        for (const scenario of state.scenarios) {
+          await supabase.from('scenarios').upsert({
+            id:      scenario.id,
+            user_id: userId,
+            name:    scenario.name,
+            data:    scenario,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'id' })
+        }
+      }, 2000)
+    })
+  }, [state])
+
+  // Load from Supabase on login
+  const loadFromSupabase = async (userId) => {
+    const { data, error } = await supabase
+      .from('scenarios')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true })
+
+    if (error || !data?.length) return
+
+    const scenarios = data.map(row => row.data)
+    dispatch({ type: 'LOAD_SCENARIOS', scenarios, activeId: scenarios[0].id })
+  }
+
+  // Listen for auth changes to load/clear cloud data
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        await loadFromSupabase(session.user.id)
+      }
+      if (event === 'SIGNED_OUT') {
+        dispatch({ type: 'RESET_TO_DEFAULT' })
+      }
+    })
+    // Load on mount if already logged in
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) loadFromSupabase(session.user.id)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
   const activeScenario = state.scenarios.find(s => s.id === state.activeId) || state.scenarios[0]
 

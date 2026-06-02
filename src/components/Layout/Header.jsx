@@ -1,7 +1,7 @@
 import React from 'react'
 import { useScenario } from '../../context/ScenarioContext.jsx'
 
-export default function Header({ tabs, activeTab, onTabChange, onToggleSidebar, polymarket }) {
+export default function Header({ tabs, activeTab, onTabChange, onToggleSidebar, polymarket, user, onAuthClick, onSignOut }) {
   const { activeScenario, state } = useScenario()
   const { isLive, isFallback, countdown, loading } = polymarket
 
@@ -35,6 +35,22 @@ export default function Header({ tabs, activeTab, onTabChange, onToggleSidebar, 
             </div>
           )}
         </div>
+
+        {/* Auth button */}
+        {user ? (
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[10px] text-slate-500 hidden sm:block truncate max-w-[120px]">{user.email}</span>
+            <button onClick={onSignOut}
+              className="text-[10px] border border-navy-400 text-slate-400 hover:border-danger hover:text-danger px-2.5 py-1.5 rounded-lg transition-colors">
+              Sign Out
+            </button>
+          </div>
+        ) : (
+          <button onClick={onAuthClick}
+            className="btn-primary text-xs py-1.5 px-4 shrink-0">
+            Sign In
+          </button>
+        )}
 
         {/* Scenario picker */}
         <button onClick={onToggleSidebar} className="scenario-pill flex items-center gap-2 px-3 py-1.5 max-w-[200px]">
